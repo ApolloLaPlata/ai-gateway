@@ -137,12 +137,12 @@ data "aws_iam_policy_document" "litellm_exec_extra" {
   }
 
   statement {
-    sid    = "AllowReadLiteLLMDBPassword"
+    sid    = "AllowReadLiteLLMDatabaseURL"
     effect = "Allow"
     actions = [
       "secretsmanager:GetSecretValue"
     ]
-    resources = [aws_secretsmanager_secret.litellm_db_password.arn]
+    resources = [aws_secretsmanager_secret.litellm_database_url.arn]
   }
 
   statement {

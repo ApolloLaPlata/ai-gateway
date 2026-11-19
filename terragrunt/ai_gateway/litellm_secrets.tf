@@ -30,6 +30,22 @@ resource "aws_secretsmanager_secret_version" "litellm_db_password" {
   secret_string = var.litellm_db_password
 }
 
+resource "aws_secretsmanager_secret" "litellm_database_url" {
+  name        = "${var.name_prefix}/litellm/database-url"
+  description = "LiteLLM Aurora PostgreSQL connection string"
+  kms_key_id  = aws_kms_key.invocation_logs.arn
+
+  tags = merge(local.common_tags, {
+    Name      = "${var.name_prefix}-litellm-database-url"
+    ssc_cbrid = "22DH"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "litellm_database_url" {
+  secret_id     = aws_secretsmanager_secret.litellm_database_url.id
+  secret_string = local.litellm_database_url
+}
+
 resource "aws_secretsmanager_secret" "litellm_redis_auth_token" {
   name        = "${var.name_prefix}/litellm/redis-auth-token"
   description = "LiteLLM Elasticache Redis AUTH token"
