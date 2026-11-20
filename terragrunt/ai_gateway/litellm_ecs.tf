@@ -9,10 +9,12 @@ data "aws_secretsmanager_secret_version" "litellm_master_key" {
 }
 
 locals {
+  # Stored in Secrets Manager (litellm_secrets.tf); never place in container_environment.
   litellm_database_url = "postgresql://${var.litellm_database_username}:${urlencode(data.aws_secretsmanager_secret_version.litellm_db_password.secret_string)}@${module.litellm_rds.rds_cluster_endpoint}:5432/${var.litellm_database_name}?sslmode=${var.litellm_postgres_ssl_mode}"
   litellm_managed_secret_rollout_token = join(":", compact([
     var.litellm_force_redeploy_token,
     data.aws_secretsmanager_secret_version.litellm_db_password.version_id,
+    aws_secretsmanager_secret_version.litellm_database_url.version_id,
     data.aws_secretsmanager_secret_version.litellm_master_key.version_id,
     data.aws_secretsmanager_secret_version.litellm_redis_auth_token.version_id,
     md5(local.litellm_config_content),
@@ -100,7 +102,6 @@ module "litellm" {
   container_environment = [
     { name = "AWS_REGION", value = var.primary_region },
     { name = "LITELLM_FORCE_REDEPLOY_TOKEN", value = local.litellm_managed_secret_rollout_token },
-    { name = "DATABASE_URL", value = local.litellm_database_url },
     { name = "REDIS_HOST", value = aws_elasticache_replication_group.litellm.primary_endpoint_address },
     { name = "REDIS_PORT", value = "6379" },
     { name = "REDIS_SSL", value = "true" },
@@ -128,6 +129,7 @@ module "litellm" {
   ]
 
   container_secrets = [
+    { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.litellm_database_url.arn },
     { name = "LITELLM_MASTER_KEY", valueFrom = aws_secretsmanager_secret.litellm_master_key.arn },
     { name = "REDIS_PASSWORD", valueFrom = aws_secretsmanager_secret.litellm_redis_auth_token.arn }
   ]
