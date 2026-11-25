@@ -76,13 +76,10 @@ resource "aws_cloudtrail" "bedrock_audit" {
   # regardless of whether traffic routes through the VPC endpoint or the public
   # Bedrock API. VPC flow logs only capture traffic inside the VPC; CloudTrail
   # is the correct tool for Bedrock API observability.
-  advanced_event_selector {
-    name = "BedrockManagementEvents"
-
-    field_selector {
-      field  = "eventCategory"
-      equals = ["Management"]
-    }
+  # Classic event_selector (not advanced) so compliance scans reading GetEventSelectors see it.
+  event_selector {
+    read_write_type           = "All"
+    include_management_events = true
   }
 
   tags = local.common_tags
